@@ -15,19 +15,18 @@ output:
 
 # MSA Summer Practicum
 
-The task was to take the flight dataset and make some value for the stakeholders.
+The task was to take the flight dataset and make some value for US DOT executive. The assignment was open-ended and non-directed. At the culmination of the summer session, each team delivered a 20 minute presentation outlining their analyses.
 
-I, Max Spehlmann, worked with a team of 4 Master's students, Zane Potorti, Salem Wear, Teresa Meng, and Rena Marrotta.
-<br>
-<br>
-<br>
+
+I, Max Spehlmann, worked with a team of 4 Master's students, Zane Potorti, Salem Wear, Teresa Meng, and Rena Marrotta. We decided to create a logistic model that predicts the carrier delay of a flight. If a flight is considered delayed due to factors within the airline's control, it is referred to as a carrier delay.
+
 
 # Importing the Datasets
 
 First things first, let's get our R environment set up with the proper packages.
 
-```{r setup}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, message=FALSE, warning= FALSE}
+knitr::opts_chunk$set(message = FALSE)
 library(tidyverse)
 library(here)
 library(lubridate)
@@ -454,7 +453,7 @@ save(test_data, file=here("r_data","test_data.Rdata"))
 
 # Modeling
 
-Finally we were ready to build our model.
+Finally we were ready to build our model. After building the model on the testing data set, and tuning it on the training dataset, we rebuilt the model with the full dataset.
 
 ```{r modelBuilding, eval=FALSE}
 load(file = here("r_data","all_data_subsetted_with_joins_and_transformations_NAs_processed.RData"))
@@ -463,17 +462,20 @@ load(file = here("r_data","train_data.RData"))
 
 train_data$Operating_Airline <- factor(train_data$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA"))
 test_data$Operating_Airline <- factor(test_data$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA"))
-full$Operating_Airline <- factor(full$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA"))
+
+full$Operating_Airline <- factor(full$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA")) 
+full <- full %>% filter(!(Operating_Airline %in% c("G4", "AS", "B6")))
 
 train_data <- train_data %>% mutate(probCarrierDelay = as.factor(probCarrierDelay))
 test_data <- test_data %>% mutate(probCarrierDelay = as.factor(probCarrierDelay))
 full <- full %>% mutate(probCarrierDelay = as.factor(ifelse(CarrierDelay == 0, 0, 1)))
+full <- full %>% mutate(minutesSinceLastFlight = ifelse(is.na(minutesSinceLastFlight), 0, minutesSinceLastFlight))
 
 #Restate final variables, obeying model hierarchy
 finalGLM <- glm(probCarrierDelay ~ DayOfWeek + NO.SEATS + Month + Operating_Airline +
-                  TYPE.ENG + Origin + numFlights + holiday + 
+                  TYPE.ENG + Origin + numFlights + holiday +
                   FlightsPerOrgAirport + YEAR.MFR + minutesSinceLastFlight + prevCarrierDelay + 
-                  I(sqrt(LateAircraftDelay)) + minutesSinceLastFlight*prevCarrierDelay + NO.SEATS*Origin, data=train_data,
+                  I(sqrt(LateAircraftDelay)) + minutesSinceLastFlight*prevCarrierDelay + NO.SEATS*Origin, data=full,
                 family=binomial(link="logit"), 
                 contrasts=list(Month = contr.sum, TYPE.ENG = contr.sum, Origin = contr.sum, DayOfWeek = contr.sum, Operating_Airline = contr.sum))
 
@@ -482,12 +484,41 @@ concordance(finalGLM)
 concordance(finalGLM, newdata = test_data)
 vif(finalGLM)
 
-#save(finalGLM, file='finalGLM.RData')
+save(finalGLM, file=here("r_data",'finalGLM.RData'))
 control <- exp(finalGLM$coefficients['(Intercept)'])/ (1+exp(finalGLM$coefficients['(Intercept)']))
 GLMCoefficients <- 100 * (exp(finalGLM$coefficients)-1)
 GLMCoefficients <- finalGLM$coefficients
 #write.csv(GLMCoefficients, 'GLMCoefficients.csv')
 ```
 
+# Visualizing the Results
 
+We created a heatmap to show how our model performed for different combinations of operating airlines and destination airports. The darker the color, the less accurate the performance. <br>
+
+For some combinations of carriers and destinations, our model performs very poorly. There are likely stochastically variable conditions at these airports that pose conflicts for certain airlines.
+
+```{r visualizing}
+load(here("r_data",'finalGLM.RData'))
+load(file = here("r_data","all_data_subsetted_with_joins_and_transformations_NAs_processed.RData"))
+full <- full %>% filter(!(Operating_Airline %in% c("G4", "AS", "B6")))
+#grab the predicted values
+predicted_probs <- as.data.frame(predict(finalGLM, type = "response"))
+colnames(predicted_probs) <- "predicted_prob"
+
+
+cols_of_interest <- full %>% select(Dest, Operating_Airline, probCarrierDelay) %>% rename(actual_prob = probCarrierDelay) %>% bind_cols(predicted_probs) %>% mutate(actual_prob = as.numeric(as.character(actual_prob)), predicted_prob = as.numeric(predicted_prob)) %>% mutate(abs_dif = abs(actual_prob - predicted_prob))
+
+# Create a heatmap ggplot2
+heatmap_plot <- cols_of_interest %>%
+  ggplot(aes(x = Operating_Airline, y = Dest)) +
+  geom_tile(aes(fill = abs_dif), color = "white") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = "Heatmap of Absolute Difference", x = "Operating Airline", y = "Dest") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Show the heatmap plot
+heatmap_plot
+
+```
 
