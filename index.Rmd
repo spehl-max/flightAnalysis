@@ -1,0 +1,493 @@
+---
+title: "Flight Analysis"
+date: "`r Sys.Date()`"
+author: Max Spehlmann
+output:
+  rmdformats::robobook:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+    code_folding: hide
+    toc_depth: 1
+---
+
+# MSA Summer Practicum
+
+The task was to take the flight dataset and make some value for the stakeholders.
+
+I, Max Spehlmann, worked with a team of 4 Master's students, Zane Potorti, Salem Wear, Teresa Meng, and Rena Marrotta.
+<br>
+<br>
+<br>
+
+# Importing the Datasets
+
+First things first, let's get our R environment set up with the proper packages.
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(lubridate)
+library(car)
+library(here)
+library(dplyr)
+library(glmnet)
+library(survival)
+library(gmodels)
+library(Metrics)
+library(ggplot2)
+#library(Dict)
+```
+
+
+These datasets were downloaded from the US DOT Transtats repository. Accessible here, https://www.transtats.bts.gov/tables.asp?qo_vq=EFD&QO_anzr= <br>
+
+We begin by defining a function to sort out parsing errors.
+```{r parsingErrors}
+
+import_remove_parsing_errors <- function(input_file_path){
+
+#import, let readr try to guess all the column types with default settings
+current_import <- read_csv(input_file_path, col_types = cols(FlightDate = col_date(format = "%Y-%m-%d")))
+
+
+#many issues were detected. Find the last row with a parsing issue
+last_row_with_issue <- max(problems(current_import)$row)
+
+#reimport to remove errors
+current_import <- read_csv(input_file_path, col_types = cols(FlightDate = col_date(format = "%Y-%m-%d")),guess_max = last_row_with_issue)
+
+#figure out which columns are only filled with NA
+remove_vars <- colnames(current_import[which(!is.na(current_import[,dim(current_import)[[2]]])), dim(current_import)[[2]]])
+
+#filter them out
+current_import <- current_import %>% select(-all_of(remove_vars))
+
+#return the clean data
+return(current_import) 
+}
+
+```
+
+Then we make a function to save all of the .csv files as .Rdata files, so that the data types will be correctly set anytime we re-import the data to our R environment.
+```{r smartSave}
+
+
+compare_two_imports <- function(df_ref, df_new){
+  column_info_ref <- data.frame(
+  Column_Name = names(df_ref),
+  Column_Type = sapply(df_ref, class),
+  stringsAsFactors = FALSE)
+  
+  column_info_new <- data.frame(
+  Column_Name = names(df_new),
+  Column_Type = sapply(df_new, class),
+  stringsAsFactors = FALSE)
+  
+ dif_values <- column_info_ref %>%
+  mutate(same_values = Column_Name == column_info_new$Column_Name & 
+           Column_Type == column_info_new$Column_Type) %>%
+  filter(!same_values)
+
+return(dif_values)
+}
+
+save_it_up <- function(input_df){
+  calling_variable_plus_RData <- paste(deparse(substitute(input_df)),".RData", sep = "")
+  save(input_df, file = here("r_data", calling_variable_plus_RData))
+}
+
+```
+
+This is the code to import the csv's from the transtats database. If you would like to update these values, you may. Currently the script pulls in data from April 2022 - March 2023.
+
+```{r, eval = FALSE}
+twenty_three_one <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2023_1.csv')
+
+save_it_up(twenty_three_one)
+
+twenty_three_two <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2023_2.csv')
+
+compare_two_imports(twenty_three_one, twenty_three_two)
+
+save_it_up(twenty_three_two)
+
+twenty_three_three <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2023_3.csv')
+
+compare_two_imports(twenty_three_one, twenty_three_three)
+
+save_it_up(twenty_three_three)
+
+twenty_two_four <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_4.csv')
+
+compare_two_imports(twenty_three_one, twenty_two_four)
+
+save_it_up(twenty_two_four)
+
+twenty_two_five <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_5.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_five)
+
+save_it_up(twenty_two_five)
+
+twenty_two_six <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_6.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_six)
+
+save_it_up(twenty_two_six)
+
+twenty_two_seven <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_7.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_seven)
+
+save_it_up(twenty_two_seven)
+
+twenty_two_eight <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_8.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_eight)
+
+save_it_up(twenty_two_eight)
+
+twenty_two_nine <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_9.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_nine)
+
+save_it_up(twenty_two_nine)
+
+twenty_two_ten <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_10.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_ten)
+
+save_it_up(twenty_two_ten)
+
+twenty_two_eleven <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_11.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_eleven)
+
+save_it_up(twenty_two_eleven)
+
+twenty_two_twelve <- import_remove_parsing_errors('On_Time_Marketing_Carrier_On_Time_Performance_(Beginning_January_2018)_2022_12.csv')
+
+compare_two_imports(twenty_two_four, twenty_two_twelve)
+
+save_it_up(twenty_two_twelve)
+```
+
+# Combining and Subsetting the Datasets
+
+Now we are going to combine all of the flight data from all of the months into one dataframe. We can use the bind_rows() function from the tidyverse package because we ensured all of the columns were parsed correctly. <br>
+
+This function will load all of the .Rdata files that we saved when we imported the .csv's above.
+
+```{r loadData, eval = FALSE}
+df_names <- c("twenty_three_one", "twenty_three_two", "twenty_three_three", "twenty_two_four", "twenty_two_five", "twenty_two_six", "twenty_two_seven", "twenty_two_eight", "twenty_two_nine", "twenty_two_ten", "twenty_two_eleven", "twenty_two_twelve")
+
+smartLoad <- function(input_names){
+  df_list <- list()
+  for(i in seq_along(input_names)){
+    file_name <- paste0(input_names[[i]], ".RData")
+    load(here("r_data", file_name))
+    df_list[[input_names[[i]]]] <- input_df
+  }
+  return(df_list)
+}
+
+all_data_list <- smartLoad(df_names)
+
+all_data_list[[7]]["Div2WheelsOff"] <- as.character(all_data_list[[7]][["Div2WheelsOff"]])
+
+all_data_df <- bind_rows(all_data_list)
+```
+
+Here we subsetted our data by the 10 most busy airports. We then selected only flights that flew between two airports that were each top 10 airports. We also subsetted by the ten most busy airlines. Feel free to change these values to generate unique subsets, or use the entire datasets on your local machine.
+
+```{r beginPortfromTestDataAnalysis, eval=FALSE}
+full <- all_data_df
+
+top_airports <- c("ATL",  "DFW",  "DEN", "ORD",  "LAX", "CLT", "MCO", "LAS","PHX", "MIA")
+full <- full %>%
+  filter(Origin %in% top_airports) %>%
+  filter(Dest %in% top_airports)
+
+full <- full %>%
+  mutate(Route = paste(Origin, Dest, sep=""))%>%
+  mutate(Route = as.factor(Route))
+
+full <- full %>%
+  mutate(Carrier_Category = case_when(
+    Operating_Airline == "WN" ~ 0,
+    Operating_Airline == "NK" ~ 0,
+    Operating_Airline == "B6" ~ 0, 
+    Operating_Airline == "F9" ~ 0,
+    Operating_Airline == "G4" ~ 0,
+    Operating_Airline == "AA" ~ 1,
+    Operating_Airline == "DL" ~ 1,
+    Operating_Airline == "UA" ~ 1, 
+    Operating_Airline == "HA" ~ 1,
+    Operating_Airline == "AS" ~ 1,
+    TRUE ~ 2
+  )) %>%
+  mutate(Carrier_Category = as.factor(Carrier_Category))
+
+full <- full %>% filter(!(Carrier_Category == 2))
+
+full <- full %>% 
+  group_by(Operating_Airline, FlightDate) %>%
+  mutate(FlightsPerAirline = n()) %>%
+  ungroup()
+
+full <- full %>%
+  group_by(Origin, FlightDate) %>%
+  mutate(FlightsPerOrgAirport = n()) %>%
+  ungroup()
+
+#Removes irrelevant variables and factors necessary ones
+full <- full %>% mutate(Quarter = as.factor(Quarter), Month = as.factor(Month), DayofMonth = as.factor(DayofMonth), DayOfWeek = as.factor(DayOfWeek), Carrier_Category = as.factor(Carrier_Category)) %>% select(CarrierDelay, FlightDate, FlightsPerAirline, FlightsPerOrgAirport, Marketing_Airline_Network, Operating_Airline, Origin, Dest, Distance, Tail_Number, Route, Quarter, Month, DayofMonth, DayOfWeek, Carrier_Category, DepTime, ArrTime, LateAircraftDelay)
+
+save(full, file = here("r_data", "all_data_subsetted.RData"))
+
+write.csv(full, here("raw_data","subsetted_data.csv"), row.names = F)
+```
+
+
+# Transforming and Joining the Data
+
+We decided to use the FAA Civil Aviation Registry to pull in data relating the tail number of all the planes to information about the aircraft, e.g., the model of the plane, the number of seats, the date of construction, etc. <br>
+
+We began by creating a profile of all of the aircraft in our subsetted data. 
+
+```{r begin creatingPlaneProfiles, eval = FALSE}
+master <- read.csv(here("raw_data", "MASTER.csv"), colClasses=c("ENG.MFR.MDL"='character'))
+colnames(master)[1]='Tail_Number'
+
+master$Tail_Number <- paste("N",master$Tail_Number, sep='')
+engineInfo <- read.csv(here("raw_data","ENGINE.csv"),colClasses=c("ï..CODE"='character'))
+colnames(engineInfo)[1:4]=c('ENG.MFR.MDL', 'MFR.ENG','MODEL.ENG','TYPE.ENG')
+aircraftRef <- read.csv(here("raw_data","ACFTREF.csv"))
+colnames(aircraftRef)[1:4]=c('MFR.MDL.CODE','MFR.ACFT','MODEL.ACFT','TYPE.ACFT')
+
+#establishes a profile for each unique plane
+planeDB <- data.frame(Tail_Number=c(unique(full$Tail_Number)), numFlights = 0, airTime = 0)
+
+#Initializes progress report variables
+computingProgress = 0
+computingStep = round(nrow(full)/100,0)
+
+#populating profile fields
+for (fullIndex in seq(1,nrow(full))){
+    #matches the plane in "full" with its profile
+  planeIndex = which(planeDB$Tail_Number==full$Tail_Number[fullIndex])
+  
+    #counts the number of flights each plane goes on
+  planeDB$numFlights[planeIndex] = planeDB$numFlights[planeIndex]+1
+  
+  #Intermittent progress report
+  if(!(fullIndex%%computingStep)){
+    computingProgress = computingProgress + 1
+    print(paste('Completion:',computingProgress,'%'))
+  }
+}
+
+#creates the full master list with plane and engine info by tail number
+PlaneProfiles <- master %>% 
+  left_join(aircraftRef, by='MFR.MDL.CODE') %>%
+  left_join(engineInfo, by='ENG.MFR.MDL') %>%
+  left_join(planeDB[,c('Tail_Number','numFlights')],by='Tail_Number')
+save(PlaneProfiles,file=here("r_data",'PlaneProfiles.RData'))
+
+#creates the holiday variable for all days in the year
+holidayDF <- data.frame(DayofMonth = c(rep(seq(1,31),12)), Month =c( c(rep(1,31)),c(rep(2,31)),c(rep(3,31)),c(rep(4,31)),c(rep(5,31)),c(rep(6,31)),c(rep(7,31)),c(rep(8,31)),c(rep(9,31)),c(rep(10,31)),c(rep(11,31)),c(rep(12,31))),holiday=0)
+#assigns holidays to labor day, memorial day, july 4, thanksgiving, and christmas-new years, as well as the day before/after
+holidayDF[c(5*31,5*31-1,5*31-2),3]=1
+holidayDF[c(12*31,12*31-1,12*31-2,12*31-3,12*31-4,12*31-5,12*31-6,12*31-7,12*31-8),3]=1
+holidayDF[c(8*31+5,8*31+6,8*31+4),3]=1
+holidayDF[c(11*31-8,11*31-7,11*31-6),3]=1
+holidayDF[c(6*31+3,6*31+4,6*31+5),3]=1
+save(holidayDF,file='holidayDF.RData')
+
+```
+
+Because delays tend to compound (if a plane is delayed for one flight, it is more likely to be delayed on subsequent flights) we corrected the non-independence of flight delays.
+
+```{r correctNonIndependence, eval=FALSE}
+#Initialize dataframe
+prevDelayInfo <- full %>% select(DepTime, ArrTime, CarrierDelay, FlightDate, Tail_Number)
+
+#Formats DepTime and ArrTime in a usable way
+prevDelayInfo <- prevDelayInfo %>% mutate(DepTime = strptime(DepTime, format = "%H%M"), ArrTime = strptime(ArrTime, format = "%H%M")) %>% mutate(DepTime = format(DepTime,format="%H:%M"), ArrTime = format(ArrTime,format="%H:%M")) %>% 
+  mutate(prevCarrierDelay = 0, timeSinceLastFlight = 0) %>% #creates a variable for the delay of a plane's last flight
+  group_by(Tail_Number) %>% arrange(FlightDate, DepTime, .by_group=TRUE) #arranges the flights so all of a given plane's flights are adjacent and in order
+ 
+#Replaces NAs with 99:99 to avoid errors later on
+prevDelayInfo$DepTime <- replace_na(prevDelayInfo$DepTime, '99:99')
+prevDelayInfo$ArrTime <- replace_na(prevDelayInfo$ArrTime, '99:99')
+
+#Iterates over all flights. This excludes the last flight because that one has no following flight to compare with
+for (rowIndex in seq(1,nrow(prevDelayInfo)-1)){
+  nextIndex=rowIndex+1 #code breaks without indexing this specific way
+  
+  #If the two flights used the same valid plane, this records whether there was a carrier delay for the first flight within the second flight's row. I'm not sure why but some of these conditional statements below only return usable values when when index [[1]] is called
+  if((!is.na(prevDelayInfo$Tail_Number[rowIndex]) & !is.na(prevDelayInfo$Tail_Number[nextIndex]))[[1]] & (prevDelayInfo$Tail_Number[rowIndex]==prevDelayInfo$Tail_Number[nextIndex])[[1]]){
+      prevDelayInfo$prevCarrierDelay[rowIndex+1]=prevDelayInfo$CarrierDelay[rowIndex]
+    }
+
+  #Checks if the 2 flights have the same valid tail numbers and valid departure times
+  if((!is.na(prevDelayInfo$Tail_Number[rowIndex]) & !is.na(prevDelayInfo$Tail_Number[nextIndex]))[[1]] & (prevDelayInfo$Tail_Number[rowIndex]==prevDelayInfo$Tail_Number[nextIndex])[[1]] &
+prevDelayInfo$DepTime[rowIndex] != "99:99" &
+prevDelayInfo$DepTime[nextIndex] != "99:99"){
+    
+    #If the 2 flights are on the same day, records the time between the flights
+      if((day(prevDelayInfo$FlightDate[rowIndex])==day(prevDelayInfo$FlightDate[nextIndex])[[1]])){
+        prevDelayInfo$timeSinceLastFlight[nextIndex] <- as.numeric((hm(prevDelayInfo$DepTime[nextIndex])-hm(prevDelayInfo$ArrTime[rowIndex])))
+    #If the 2 flights are on adjacent days, records the time between the flights
+      } else if((day(prevDelayInfo$FlightDate[rowIndex]+1)==day(prevDelayInfo$FlightDate[nextIndex])[[1]])){
+        prevDelayInfo$timeSinceLastFlight[nextIndex] <- as.numeric((hm(prevDelayInfo$DepTime[nextIndex])+hm("24:00")-hm(prevDelayInfo$ArrTime[rowIndex]))) 
+      }
+    }
+}
+
+#Reformats DepTime to be used as a join key with full, removes obsolete variables
+prevDelayInfo <- prevDelayInfo %>% select(-c(ArrTime, CarrierDelay)) %>% rowwise() %>% mutate(DepTime = paste(paste(strsplit(prevDelayInfo$DepTime, split='')[[1]][1:2],collapse=''),':',paste(strsplit(prevDelayInfo$DepTime, split='')[[1]][3:4],collapse=''),collapse=''))
+
+save(prevDelayInfo, file=here("r_data","prevDelayInfo.RData"))
+```
+
+Next, we added variables related to holidays, joined our plane profiles to the flight datasets, and corrected missing values.
+
+```{r begin usingPlaneProfiles, eval = FALSE}
+load(here("r_data","all_data_subsetted.RData"))
+
+load(here("r_data",'PlaneProfiles.RData'))
+
+load(here("r_data",'holidayDF.RData'))
+
+load(here("r_data",'CarrierDelayTimeSinceLastFlight.RData'))
+
+holidayDF <- holidayDF %>% mutate(DayofMonth = as.factor(DayofMonth)) %>% mutate(Month = as.factor(Month))
+
+full <- full %>% left_join(PlaneProfiles, by='Tail_Number') %>% left_join(holidayDF,by=c('DayofMonth','Month')) %>% left_join(CarrierDelayTimeSinceLastFlight, by=c('Tail_Number','FlightDate','DepTime'))
+
+
+#Fixing duplicated variable
+full$TYPE.ENG <- full$TYPE.ENG.x
+
+#fixing weird variable
+full <- full %>% mutate(YEAR.MFR = ifelse(YEAR.MFR==2011.152, 2011.000, YEAR.MFR))
+unique(full$YEAR.MFR)
+
+#Treatment for NAs
+full$DepDelay <- replace_na(full$DepDelay,0)
+full$CarrierDelay <- replace_na(full$CarrierDelay,0)
+full$LateAircraftDelay <- replace_na(full$LateAircraftDelay,0) 
+full$WeatherDelay <- replace_na(full$WeatherDelay,0)
+full$TYPE.ENG <- replace_na(full$TYPE.ENG,0)
+full$THRUST <- replace_na(full$THRUST,0) #horsepower and thrust are set to 0 because the creator of the master file set unknown values to 0 already and there's few enough values to factor them
+full$HORSEPOWER <- replace_na(full$HORSEPOWER,0)
+full$prevCarrierDelay <- replace_na(full$prevCarrierDelay, 0)
+full$minutesSinceLastFlight <- replace_na(full$minutesSinceLastFlight, 1440)
+full$MODEL.ENG <- replace_na(full$MODEL.ENG,'UNKNOWN')
+full$MFR.ENG <- replace_na(full$MFR.ENG,'UNKNOWN')
+full$MODEL.ACFT <- replace_na(full$MODEL.ACFT,'UNKNOWN')
+full$Tail_Number <- replace_na(full$Tail_Number, 'UNKNOWN')
+full$NO.SEATS[is.na(full$NO.SEATS)]<-mean(full$NO.SEATS,na.rm=TRUE)
+full$YEAR.MFR[is.na(full$YEAR.MFR)]<-mean(full$YEAR.MFR,na.rm=TRUE)
+full$numFlights[is.na(full$numFlights)]<-mean(full$numFlights,na.rm=TRUE)
+full$DepTime <- replace_na(full$DepTime, '99:99')
+full$ArrTime <- replace_na(full$ArrTime, '99:99')
+
+#Removes irrelevant variables and factors necessary ones
+full <- full %>% mutate(Quarter = as.factor(Quarter), Month = as.factor(Month), DayofMonth = as.factor(DayofMonth), DayOfWeek = as.factor(DayOfWeek), Carrier_Category = as.factor(Carrier_Category), MODEL.ENG =  as.factor(MODEL.ENG), HORSEPOWER = as.factor(HORSEPOWER), THRUST = as.factor(THRUST), TYPE.ENG = as.factor(TYPE.ENG)) %>% select(CarrierDelay, FlightDate, FlightsPerAirline, FlightsPerOrgAirport, Marketing_Airline_Network, Operating_Airline, Origin, Dest, Distance, Tail_Number, Route, numFlights, holiday, YEAR.MFR, MODEL.ACFT, NO.SEATS, MFR.ENG, Quarter, Month, DayofMonth, DayOfWeek, Carrier_Category, MODEL.ENG, HORSEPOWER, THRUST, TYPE.ENG, DepTime, ArrTime, minutesSinceLastFlight, prevCarrierDelay, LateAircraftDelay)
+
+#Adding transformations
+
+full$logCarrierDelay <- log(full$CarrierDelay)
+full$logPrevCarrierDelay <- log(full$prevCarrierDelay)
+full$recipRootCarrierDelay <- -1/sqrt(full$CarrierDelay)
+full$recipRootCarrierDelay <- replace_na(full$recipRootCarrierDelay, -1)
+full$probCarrierDelay <- ifelse(full$CarrierDelay>0, 1, 0)
+
+save(full, file = here("r_data", "all_data_subsetted_with_joins_and_transformations_NAs_processed.RData"))
+```
+
+# Splitting the Data
+
+Next we were ready to split the flight dataset into train and test subsets so that we could create a model predicting flight delays.
+
+```{r splitData, eval=FALSE}
+#this will import "full" df
+
+load(file = here("r_data","all_data_subsetted_with_joins_and_transformations_NAs_processed.RData"))
+
+#we will use a split of 0.7 for training and 0.3 for testing
+
+set.seed(123)
+
+# Generate random indices for splitting
+indices <- sample(1:nrow(full))
+
+# Calculate the number of rows for each subset
+num_rows <- nrow(full)
+train_rows <- round(0.7 * num_rows)
+test_rows <- num_rows - train_rows
+
+# Split the dataframe into subsets
+train_data <- full[indices[1:train_rows], ]
+test_data <- full[indices[(train_rows + 1):num_rows], ]
+
+#Changes the only G4 flight with a carrier delay to the training data. Otherwise models cannot function. Run this by hand.
+train_data[which(train_data$Operating_Airline=='G4'),]
+test_data[which(test_data$Operating_Airline=='G4'),]
+which(test_data$Operating_Airline=='G4')
+train_data <- rbind(train_data, test_data[43268,])
+test_data <- test_data[-c(43268),]
+test_data[43268]
+
+#save these objects
+save(train_data, file=here("r_data","train_data.RData"))
+save(test_data, file=here("r_data","test_data.Rdata"))
+
+
+```
+
+# Modeling
+
+Finally we were ready to build our model.
+
+```{r modelBuilding, eval=FALSE}
+load(file = here("r_data","all_data_subsetted_with_joins_and_transformations_NAs_processed.RData"))
+load(file = here("r_data","test_data.RData"))
+load(file = here("r_data","train_data.RData"))
+
+train_data$Operating_Airline <- factor(train_data$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA"))
+test_data$Operating_Airline <- factor(test_data$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA"))
+full$Operating_Airline <- factor(full$Operating_Airline, levels=c("G4", "AS","B6","DL","NK","UA","WN","AA","F9", "HA"))
+
+train_data <- train_data %>% mutate(probCarrierDelay = as.factor(probCarrierDelay))
+test_data <- test_data %>% mutate(probCarrierDelay = as.factor(probCarrierDelay))
+full <- full %>% mutate(probCarrierDelay = as.factor(ifelse(CarrierDelay == 0, 0, 1)))
+
+#Restate final variables, obeying model hierarchy
+finalGLM <- glm(probCarrierDelay ~ DayOfWeek + NO.SEATS + Month + Operating_Airline +
+                  TYPE.ENG + Origin + numFlights + holiday + 
+                  FlightsPerOrgAirport + YEAR.MFR + minutesSinceLastFlight + prevCarrierDelay + 
+                  I(sqrt(LateAircraftDelay)) + minutesSinceLastFlight*prevCarrierDelay + NO.SEATS*Origin, data=train_data,
+                family=binomial(link="logit"), 
+                contrasts=list(Month = contr.sum, TYPE.ENG = contr.sum, Origin = contr.sum, DayOfWeek = contr.sum, Operating_Airline = contr.sum))
+
+summary(finalGLM)
+concordance(finalGLM)
+concordance(finalGLM, newdata = test_data)
+vif(finalGLM)
+
+#save(finalGLM, file='finalGLM.RData')
+control <- exp(finalGLM$coefficients['(Intercept)'])/ (1+exp(finalGLM$coefficients['(Intercept)']))
+GLMCoefficients <- 100 * (exp(finalGLM$coefficients)-1)
+GLMCoefficients <- finalGLM$coefficients
+#write.csv(GLMCoefficients, 'GLMCoefficients.csv')
+```
+
+
+
