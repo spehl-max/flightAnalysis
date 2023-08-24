@@ -5,7 +5,7 @@ author: Max Spehlmann
 output:
   rmdformats::robobook:
     self_contained: true
-    thumbnails: true
+    thumbnails: false
     lightbox: true
     gallery: false
     highlight: tango
@@ -497,7 +497,7 @@ We created a heatmap to show how our model performed for different combinations 
 
 For some combinations of carriers and destinations, our model performs very poorly. There are likely stochastically variable conditions at these airports that pose conflicts for certain airlines.
 
-```{r visualizing}
+```{r visualizing, eval = FALSE}
 load(here("r_data",'finalGLM.RData'))
 load(file = here("r_data","all_data_subsetted_with_joins_and_transformations_NAs_processed.RData"))
 full <- full %>% filter(!(Operating_Airline %in% c("G4", "AS", "B6")))
@@ -513,12 +513,18 @@ heatmap_plot <- cols_of_interest %>%
   ggplot(aes(x = Operating_Airline, y = Dest)) +
   geom_tile(aes(fill = abs_dif), color = "white") +
   scale_fill_gradient(low = "white", high = "blue") +
-  labs(title = "Heatmap of Absolute Difference", x = "Operating Airline", y = "Dest") +
+  labs(x = "Operating Airline", y = "Arrival Airport") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  scale_x_discrete(labels = c("AA" = "American", "DL" = "Delta", "F9" = "Frontier", "NK" = "Spirit", "AS" = "Alaska", "UA" = "United", "WN" = "Southwest")) +
+  labs(fill = "Absolute Difference")
 
-# Show the heatmap plot
-heatmap_plot
-
+# Save the heatmap plot
+saveRDS(heatmap_plot, file = here("plots", "heatmap_plot.rds"))
 ```
 
+```{r displayPlot, echo = FALSE, fig.align= 'center', dpi= 300, fig.cap="Heatmap of absolute difference of predicted vs. actual probability of flight delay."}
+heatmap_plot <- readRDS(here("plots","heatmap_plot.rds"))
+
+heatmap_plot 
+```
