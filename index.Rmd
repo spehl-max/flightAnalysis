@@ -495,7 +495,7 @@ GLMCoefficients <- finalGLM$coefficients
 
 We created a heatmap to show how our model performed for different combinations of operating airlines and destination airports. The darker the color, the less accurate the performance. <br>
 
-For some combinations of carriers and destinations, our model performs very poorly. There are likely stochastically variable conditions at these airports that pose conflicts for certain airlines.
+For some combinations of carriers and destinations, our model performs very poorly. There are likely stochastically variable conditions at these airports that pose conflicts for certain airlines. Flights flying into Atlanta International Airport are most difficult for this model to accurately predict.
 
 ```{r visualizing, eval = FALSE}
 load(here("r_data",'finalGLM.RData'))

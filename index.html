@@ -2416,8 +2416,9 @@ combinations of operating airlines and destination airports. The darker
 the color, the less accurate the performance. <br></p>
 <p>For some combinations of carriers and destinations, our model
 performs very poorly. There are likely stochastically variable
-conditions at these airports that pose conflicts for certain
-airlines.</p>
+conditions at these airports that pose conflicts for certain airlines.
+Flights flying into Atlanta International Airport are most difficult for
+this model to accurately predict.</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">load</span>(<span class="fu">here</span>(<span class="st">&quot;r_data&quot;</span>,<span class="st">&#39;finalGLM.RData&#39;</span>))</span>
 <span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">here</span>(<span class="st">&quot;r_data&quot;</span>,<span class="st">&quot;all_data_subsetted_with_joins_and_transformations_NAs_processed.RData&quot;</span>))</span>
 <span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>full <span class="ot">&lt;-</span> full <span class="sc">%&gt;%</span> <span class="fu">filter</span>(<span class="sc">!</span>(Operating_Airline <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;G4&quot;</span>, <span class="st">&quot;AS&quot;</span>, <span class="st">&quot;B6&quot;</span>)))</span>
